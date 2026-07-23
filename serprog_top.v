@@ -34,7 +34,7 @@ module uart_hello_fpga_top #(
         end
     end
 
-    uart_hello #(
+    app #(
         .CLKS_PER_BIT(CLKS_PER_BIT)
     ) u_hello (
         .clk(clk),

@@ -34,6 +34,14 @@
                     <Attr Name="CompileOrder" Val="3"/>
                 </FileInfo>
             </File>
+            <File Path="app.v">
+                <FileInfo>
+                    <Attr Name="UsedInSyn" Val="true"/>
+                    <Attr Name="UsedInP&R" Val="true"/>
+                    <Attr Name="BelongTo" Val="design_1"/>
+                    <Attr Name="CompileOrder" Val="4"/>
+                </FileInfo>
+            </File>
         </Verilog>
         <ADC_FILE>
             <File Path="serprog.adc">
@@ -64,7 +72,7 @@
     <Configurations>
     </Configurations>
     <Project_Settings>
-        <Step_Last_Change>2026-07-23 16:57:54.405</Step_Last_Change>
+        <Step_Last_Change>2026-07-23 17:03:21.362</Step_Last_Change>
         <Current_Step>60</Current_Step>
         <Step_Status>true</Step_Status>
     </Project_Settings>
