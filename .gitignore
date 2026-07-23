@@ -1,1 +1,7 @@
-serprog.v
+build/
+simulation/
+*.log
+*.area
+*.db
+*.bit
+*.tmp*

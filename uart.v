@@ -94,11 +94,16 @@ endmodule
 
 module uart_hello #(
     parameter integer CLKS_PER_BIT = 208,
-    parameter integer MSG_LEN = 13
+    parameter integer MSG_LEN = 13,
+    parameter integer SPI_CLKS_PER_HALF_BIT = 12
 ) (
     input  wire clk,
     input  wire rst,
     output wire uart_tx_o,
+    output reg  flash_sck_out,
+    output reg  flash_cs_out,
+    output reg  flash_mosi_out,
+    input  wire flash_miso_in,
     output wire done
 );
     function [7:0] msg_byte;
@@ -123,13 +128,60 @@ module uart_hello #(
         end
     endfunction
 
+    function [7:0] spi_tx_byte;
+        input [1:0] idx;
+        begin
+            case (idx)
+                2'd0: spi_tx_byte = 8'h9F;
+                default: spi_tx_byte = 8'h00;
+            endcase
+        end
+    endfunction
+
+    function [7:0] jedec_byte;
+        input [1:0] idx;
+        input [7:0] r1;
+        input [7:0] r2;
+        input [7:0] r3;
+        begin
+            case (idx)
+                2'd0: jedec_byte = r1;
+                2'd1: jedec_byte = r2;
+                default: jedec_byte = r3;
+            endcase
+        end
+    endfunction
+
+    localparam [3:0] ST_HELLO_SEND   = 4'd0;
+    localparam [3:0] ST_HELLO_WAIT   = 4'd1;
+    localparam [3:0] ST_SPI_ASSERT   = 4'd2;
+    localparam [3:0] ST_SPI_SETUP    = 4'd3;
+    localparam [3:0] ST_SPI_CLK_HI   = 4'd4;
+    localparam [3:0] ST_SPI_CLK_LO   = 4'd5;
+    localparam [3:0] ST_SPI_DEASSERT = 4'd6;
+    localparam [3:0] ST_JEDEC_SEND   = 4'd7;
+    localparam [3:0] ST_JEDEC_WAIT   = 4'd8;
+    localparam [3:0] ST_DONE         = 4'd9;
+
     reg [7:0] tx_data;
     reg       tx_start;
     wire      tx_busy;
     wire      tx_done;
 
     reg [4:0] msg_index;
+    reg [1:0] jedec_index;
+    reg [3:0] state;
     reg       all_done;
+
+    reg [1:0] spi_byte_index;
+    reg [2:0] spi_bit_index;
+    reg [7:0] spi_tx_shift;
+    reg [7:0] spi_rx_shift;
+    reg [7:0] spi_rx0;
+    reg [7:0] spi_rx1;
+    reg [7:0] spi_rx2;
+    reg [7:0] spi_rx3;
+    reg [7:0] spi_clk_count;
 
     uart_tx #(
         .CLKS_PER_BIT(CLKS_PER_BIT)
@@ -150,24 +202,141 @@ module uart_hello #(
             tx_data   <= 8'd0;
             tx_start  <= 1'b0;
             msg_index <= 5'd0;
+            jedec_index <= 2'd0;
+            state <= ST_HELLO_SEND;
             all_done  <= 1'b0;
+
+            flash_sck_out  <= 1'b0;
+            flash_cs_out   <= 1'b1;
+            flash_mosi_out <= 1'b0;
+
+            spi_byte_index <= 2'd0;
+            spi_bit_index  <= 3'd7;
+            spi_tx_shift   <= 8'h9F;
+            spi_rx_shift   <= 8'd0;
+            spi_rx0 <= 8'd0;
+            spi_rx1 <= 8'd0;
+            spi_rx2 <= 8'd0;
+            spi_rx3 <= 8'd0;
+            spi_clk_count <= 8'd0;
         end else begin
             tx_start <= 1'b0;
 
-            if (!all_done) begin
-                if (!tx_busy && !tx_start) begin
-                    tx_data  <= msg_byte(msg_index);
-                    tx_start <= 1'b1;
-                end
-
-                if (tx_done) begin
-                    if (msg_index == MSG_LEN - 1) begin
-                        all_done <= 1'b1;
-                    end else begin
-                        msg_index <= msg_index + 5'd1;
+            case (state)
+                ST_HELLO_SEND: begin
+                    if (!tx_busy) begin
+                        tx_data  <= msg_byte(msg_index);
+                        tx_start <= 1'b1;
+                        state <= ST_HELLO_WAIT;
                     end
                 end
-            end
+
+                ST_HELLO_WAIT: begin
+                    if (tx_done) begin
+                        if (msg_index == MSG_LEN - 1) begin
+                            state <= ST_SPI_ASSERT;
+                        end else begin
+                            msg_index <= msg_index + 5'd1;
+                            state <= ST_HELLO_SEND;
+                        end
+                    end
+                end
+
+                ST_SPI_ASSERT: begin
+                    flash_cs_out <= 1'b0;
+                    flash_sck_out <= 1'b0;
+                    spi_byte_index <= 2'd0;
+                    spi_bit_index <= 3'd7;
+                    spi_tx_shift <= spi_tx_byte(2'd0);
+                    spi_rx_shift <= 8'd0;
+                    spi_clk_count <= 8'd0;
+                    state <= ST_SPI_SETUP;
+                end
+
+                ST_SPI_SETUP: begin
+                    flash_sck_out <= 1'b0;
+                    flash_mosi_out <= spi_tx_shift[spi_bit_index];
+                    spi_clk_count <= 8'd0;
+                    state <= ST_SPI_CLK_HI;
+                end
+
+                ST_SPI_CLK_HI: begin
+                    if (spi_clk_count < SPI_CLKS_PER_HALF_BIT - 1) begin
+                        spi_clk_count <= spi_clk_count + 8'd1;
+                    end else begin
+                        spi_clk_count <= 8'd0;
+                        flash_sck_out <= 1'b1;
+                        spi_rx_shift[spi_bit_index] <= flash_miso_in;
+                        state <= ST_SPI_CLK_LO;
+                    end
+                end
+
+                ST_SPI_CLK_LO: begin
+                    if (spi_clk_count < SPI_CLKS_PER_HALF_BIT - 1) begin
+                        spi_clk_count <= spi_clk_count + 8'd1;
+                    end else begin
+                        spi_clk_count <= 8'd0;
+                        flash_sck_out <= 1'b0;
+
+                        if (spi_bit_index == 3'd0) begin
+                            case (spi_byte_index)
+                                2'd0: spi_rx0 <= spi_rx_shift;
+                                2'd1: spi_rx1 <= spi_rx_shift;
+                                2'd2: spi_rx2 <= spi_rx_shift;
+                                default: spi_rx3 <= spi_rx_shift;
+                            endcase
+
+                            spi_rx_shift <= 8'd0;
+
+                            if (spi_byte_index == 2'd3) begin
+                                state <= ST_SPI_DEASSERT;
+                            end else begin
+                                spi_byte_index <= spi_byte_index + 2'd1;
+                                spi_bit_index <= 3'd7;
+                                spi_tx_shift <= spi_tx_byte(spi_byte_index + 2'd1);
+                                state <= ST_SPI_SETUP;
+                            end
+                        end else begin
+                            spi_bit_index <= spi_bit_index - 3'd1;
+                            state <= ST_SPI_SETUP;
+                        end
+                    end
+                end
+
+                ST_SPI_DEASSERT: begin
+                    flash_cs_out <= 1'b1;
+                    jedec_index <= 2'd0;
+                    state <= ST_JEDEC_SEND;
+                end
+
+                ST_JEDEC_SEND: begin
+                    if (!tx_busy) begin
+                        tx_data <= jedec_byte(jedec_index, spi_rx1, spi_rx2, spi_rx3);
+                        tx_start <= 1'b1;
+                        state <= ST_JEDEC_WAIT;
+                    end
+                end
+
+                ST_JEDEC_WAIT: begin
+                    if (tx_done) begin
+                        if (jedec_index == 2'd2) begin
+                            all_done <= 1'b1;
+                            state <= ST_DONE;
+                        end else begin
+                            jedec_index <= jedec_index + 2'd1;
+                            state <= ST_JEDEC_SEND;
+                        end
+                    end
+                end
+
+                ST_DONE: begin
+                    all_done <= 1'b1;
+                end
+
+                default: begin
+                    state <= ST_HELLO_SEND;
+                end
+            endcase
         end
     end
 endmodule
