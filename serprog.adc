@@ -1,0 +1,14 @@
+set_pin_assignment { clk } { LOCATION = K14; } 	
+set_pin_assignment { reset_n } { LOCATION = T2; } 	
+set_pin_assignment { uart_tx } { LOCATION = J13; } 
+set_pin_assignment { led_done } { LOCATION = J14; } 
+
+#set_pin_assignment { flash_sck_out } { LOCATION = R11; } 
+#set_pin_assignment { flash_cs_out } { LOCATION = T3; } 
+#set_pin_assignment { flash_miso_in } { LOCATION = T10; } 	# MOSI 
+#set_pin_assignment { flash_mosi_out } { LOCATION = P10; } # MISO
+
+#set_pin_assignment { flash_sck_out } { LOCATION = H4; } 
+#set_pin_assignment { flash_cs_out } { LOCATION = D3; } 
+#set_pin_assignment { flash_mosi_out } { LOCATION = B3; } 	# MOSI 
+#set_pin_assignment { flash_miso_in } { LOCATION = F4; } 	# MISO
