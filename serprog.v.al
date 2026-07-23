@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Project Version="1" Path="/home/wuhanstudio/serprog.v">
-    <Project_Created_Time>2026-07-23 12:32:35</Project_Created_Time>
+    <Project_Created_Time></Project_Created_Time>
     <TD_Version>5.0.28716</TD_Version>
     <UCode>00000000</UCode>
     <Name>serprog.v</Name>
@@ -24,6 +24,14 @@
                     <Attr Name="UsedInP&R" Val="true"/>
                     <Attr Name="BelongTo" Val="design_1"/>
                     <Attr Name="CompileOrder" Val="2"/>
+                </FileInfo>
+            </File>
+            <File Path="spi.v">
+                <FileInfo>
+                    <Attr Name="UsedInSyn" Val="true"/>
+                    <Attr Name="UsedInP&R" Val="true"/>
+                    <Attr Name="BelongTo" Val="design_1"/>
+                    <Attr Name="CompileOrder" Val="3"/>
                 </FileInfo>
             </File>
         </Verilog>
@@ -56,7 +64,7 @@
     <Configurations>
     </Configurations>
     <Project_Settings>
-        <Step_Last_Change>2026-07-23 16:45:23.111</Step_Last_Change>
+        <Step_Last_Change>2026-07-23 16:57:54.405</Step_Last_Change>
         <Current_Step>60</Current_Step>
         <Step_Status>true</Step_Status>
     </Project_Settings>
