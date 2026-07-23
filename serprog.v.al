@@ -10,7 +10,7 @@
     </HardWare>
     <Source_Files>
         <Verilog>
-            <File Path="serprog_top.v">
+            <File Path="src/app.v">
                 <FileInfo>
                     <Attr Name="UsedInSyn" Val="true"/>
                     <Attr Name="UsedInP&R" Val="true"/>
@@ -18,7 +18,7 @@
                     <Attr Name="CompileOrder" Val="1"/>
                 </FileInfo>
             </File>
-            <File Path="uart.v">
+            <File Path="src/serprog_top.v">
                 <FileInfo>
                     <Attr Name="UsedInSyn" Val="true"/>
                     <Attr Name="UsedInP&R" Val="true"/>
@@ -26,7 +26,7 @@
                     <Attr Name="CompileOrder" Val="2"/>
                 </FileInfo>
             </File>
-            <File Path="spi.v">
+            <File Path="src/spi.v">
                 <FileInfo>
                     <Attr Name="UsedInSyn" Val="true"/>
                     <Attr Name="UsedInP&R" Val="true"/>
@@ -34,7 +34,7 @@
                     <Attr Name="CompileOrder" Val="3"/>
                 </FileInfo>
             </File>
-            <File Path="app.v">
+            <File Path="src/uart.v">
                 <FileInfo>
                     <Attr Name="UsedInSyn" Val="true"/>
                     <Attr Name="UsedInP&R" Val="true"/>
@@ -72,7 +72,7 @@
     <Configurations>
     </Configurations>
     <Project_Settings>
-        <Step_Last_Change>2026-07-23 17:03:21.362</Step_Last_Change>
+        <Step_Last_Change>2026-07-23 17:08:12.170</Step_Last_Change>
         <Current_Step>60</Current_Step>
         <Step_Status>true</Step_Status>
     </Project_Settings>
