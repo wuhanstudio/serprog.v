@@ -152,6 +152,36 @@ module uart_hello #(
         end
     endfunction
 
+    function [7:0] hex_ascii;
+        input [3:0] nibble;
+        begin
+            if (nibble < 4'd10) begin
+                hex_ascii = 8'h30 + {4'd0, nibble};
+            end else begin
+                hex_ascii = 8'h41 + {4'd0, (nibble - 4'd10)};
+            end
+        end
+    endfunction
+
+    function [7:0] jedec_ascii_char;
+        input [2:0] idx;
+        input [7:0] r1;
+        input [7:0] r2;
+        input [7:0] r3;
+        begin
+            case (idx)
+                3'd0: jedec_ascii_char = hex_ascii(r1[7:4]);
+                3'd1: jedec_ascii_char = hex_ascii(r1[3:0]);
+                3'd2: jedec_ascii_char = hex_ascii(r2[7:4]);
+                3'd3: jedec_ascii_char = hex_ascii(r2[3:0]);
+                3'd4: jedec_ascii_char = hex_ascii(r3[7:4]);
+                3'd5: jedec_ascii_char = hex_ascii(r3[3:0]);
+                3'd6: jedec_ascii_char = 8'h0D;
+                default: jedec_ascii_char = 8'h0A;
+            endcase
+        end
+    endfunction
+
     localparam [3:0] ST_HELLO_SEND   = 4'd0;
     localparam [3:0] ST_HELLO_WAIT   = 4'd1;
     localparam [3:0] ST_SPI_ASSERT   = 4'd2;
@@ -169,7 +199,7 @@ module uart_hello #(
     wire      tx_done;
 
     reg [4:0] msg_index;
-    reg [1:0] jedec_index;
+    reg [2:0] jedec_index;
     reg [3:0] state;
     reg       all_done;
 
@@ -202,7 +232,7 @@ module uart_hello #(
             tx_data   <= 8'd0;
             tx_start  <= 1'b0;
             msg_index <= 5'd0;
-            jedec_index <= 2'd0;
+            jedec_index <= 3'd0;
             state <= ST_HELLO_SEND;
             all_done  <= 1'b0;
 
@@ -305,13 +335,13 @@ module uart_hello #(
 
                 ST_SPI_DEASSERT: begin
                     flash_cs_out <= 1'b1;
-                    jedec_index <= 2'd0;
+                    jedec_index <= 3'd0;
                     state <= ST_JEDEC_SEND;
                 end
 
                 ST_JEDEC_SEND: begin
                     if (!tx_busy) begin
-                        tx_data <= jedec_byte(jedec_index, spi_rx1, spi_rx2, spi_rx3);
+                        tx_data <= jedec_ascii_char(jedec_index, spi_rx1, spi_rx2, spi_rx3);
                         tx_start <= 1'b1;
                         state <= ST_JEDEC_WAIT;
                     end
@@ -319,11 +349,11 @@ module uart_hello #(
 
                 ST_JEDEC_WAIT: begin
                     if (tx_done) begin
-                        if (jedec_index == 2'd2) begin
+                        if (jedec_index == 3'd7) begin
                             all_done <= 1'b1;
                             state <= ST_DONE;
                         end else begin
-                            jedec_index <= jedec_index + 2'd1;
+                            jedec_index <= jedec_index + 3'd1;
                             state <= ST_JEDEC_SEND;
                         end
                     end
