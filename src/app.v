@@ -71,8 +71,8 @@ module app #(
         begin
             case (idx)
                 5'd0:  command_map_byte = 8'h3F;
-                5'd1:  command_map_byte = 8'hC9;
-                5'd2:  command_map_byte = 8'h3F;
+                5'd1:  command_map_byte = 8'h00;
+                5'd2:  command_map_byte = 8'h3D;
                 default: command_map_byte = 8'h00;
             endcase
         end
@@ -125,8 +125,16 @@ module app #(
             tx_buffer[5] <= "r";
             tx_buffer[6] <= "o";
             tx_buffer[7] <= "g";
-            tx_buffer[8] <= 8'h00;
-            send_response(8'd9);
+            tx_buffer[8] <= "-";
+            tx_buffer[9] <= "v";
+            tx_buffer[10] <= "e";
+            tx_buffer[11] <= "r";
+            tx_buffer[12] <= "i";
+            tx_buffer[13] <= "l";
+            tx_buffer[14] <= "o";
+            tx_buffer[15] <= "g";
+            tx_buffer[16] <= 8'h00;
+            send_response(8'd17);
         end
     endtask
 
@@ -239,22 +247,19 @@ module app #(
                                 send_response(8'd2);
                             end
                             S_Q_WRNMAXLEN: begin
-                                tx_buffer[0] <= S_ACK;
-                                tx_buffer[1] <= 8'd0;
-                                tx_buffer[2] <= 8'd1;
-                                tx_buffer[3] <= 8'd0;
-                                send_response(8'd4);
+                                tx_buffer[0] <= S_NAK;
+                                send_response(8'd1);
                             end
                             S_O_INIT: begin
-                                build_ack_only();
+                                tx_buffer[0] <= S_NAK;
+                                send_response(8'd1);
                             end
                             S_O_DELAY: begin
-                                extra_count <= 8'd4;
-                                extra_index <= 8'd0;
-                                state <= ST_WAIT_EXTRA;
+                                tx_buffer[0] <= S_NAK;
+                                send_response(8'd1);
                             end
                             S_O_EXEC: begin
-                                tx_buffer[0] <= S_ACK;
+                                tx_buffer[0] <= S_NAK;
                                 send_response(8'd1);
                             end
                             S_SYNCNOP: begin
@@ -300,11 +305,6 @@ module app #(
                         cmd_buffer[extra_index] <= rx_data;
                         if (extra_index == extra_count - 8'd1) begin
                             case (current_cmd)
-                                S_O_DELAY: begin
-                                    delay_count <= cmd_buffer[0] + cmd_buffer[1] + cmd_buffer[2] + cmd_buffer[3];
-                                    tx_buffer[0] <= S_ACK;
-                                    send_response(8'd1);
-                                end
                                 S_S_BUSTYPE: begin
                                     bus_type_reg <= rx_data;
                                     tx_buffer[0] <= S_ACK;
