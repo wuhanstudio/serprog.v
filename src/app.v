@@ -116,7 +116,6 @@ module app #(
     endtask
 
     task automatic build_pgm_name;
-        integer i;
         begin
             tx_buffer[0] <= S_ACK;
             tx_buffer[1] <= "s";
@@ -193,7 +192,19 @@ module app #(
         end else begin
             tx_start <= 1'b0;
 
-            if (rx_valid) begin
+            if (state == ST_TX_RESP) begin
+                if (tx_done) begin
+                    if (response_index + 8'd1 < response_len) begin
+                        response_index <= response_index + 8'd1;
+                    end else begin
+                        response_index <= 8'd0;
+                        state <= ST_IDLE;
+                    end
+                end else if (!tx_busy && response_index < response_len) begin
+                    tx_data <= tx_buffer[response_index];
+                    tx_start <= 1'b1;
+                end
+            end else if (rx_valid) begin
                 activity <= 1'b1;
                 case (state)
                     ST_IDLE: begin
@@ -355,32 +366,10 @@ module app #(
                         end
                     end
 
-                    ST_TX_RESP: begin
-                        if (!tx_busy) begin
-                            tx_data <= tx_buffer[response_index];
-                            tx_start <= 1'b1;
-                            if (response_index == response_len - 8'd1) begin
-                                state <= ST_IDLE;
-                            end else begin
-                                response_index <= response_index + 8'd1;
-                            end
-                        end
-                    end
-
                     default: begin
                         state <= ST_IDLE;
                     end
                 endcase
-            end else begin
-                if (state == ST_TX_RESP && !tx_busy) begin
-                    tx_data <= tx_buffer[response_index];
-                    tx_start <= 1'b1;
-                    if (response_index == response_len - 8'd1) begin
-                        state <= ST_IDLE;
-                    end else begin
-                        response_index <= response_index + 8'd1;
-                    end
-                end
             end
         end
     end
