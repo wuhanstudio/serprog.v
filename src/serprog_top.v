@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module uart_hello_fpga_top #(
+module serprog_top #(
     parameter integer CLK_FREQ_HZ = 24000000,
     parameter integer BAUD_RATE   = 115200,
     parameter integer RESET_CYCLES = 100000
@@ -36,7 +36,7 @@ module uart_hello_fpga_top #(
 
     app #(
         .CLKS_PER_BIT(CLKS_PER_BIT)
-    ) u_hello (
+    ) u_app (
         .clk(clk),
         .rst(rst_i),
         .uart_rx_i(uart_rx),
