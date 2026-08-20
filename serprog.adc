@@ -1,5 +1,6 @@
 set_pin_assignment { clk } { LOCATION = K14; } 	
 set_pin_assignment { reset_n } { LOCATION = K16; } 	
+set_pin_assignment { uart_rx } { LOCATION = H13; } 
 set_pin_assignment { uart_tx } { LOCATION = J13; } 
 set_pin_assignment { led_done } { LOCATION = J14; } 
 

@@ -7,6 +7,7 @@ module uart_hello_fpga_top #(
 ) (
     input  wire clk,
     input  wire reset_n,
+    input  wire uart_rx,
     output wire uart_tx,
     output wire led_done,
     output wire flash_sck_out,
@@ -14,7 +15,6 @@ module uart_hello_fpga_top #(
     output wire flash_mosi_out,
     input  wire flash_miso_in
 );
-    // Integer divider: for 24 MHz and 115200 baud this resolves to 208.
     localparam integer CLKS_PER_BIT = CLK_FREQ_HZ / BAUD_RATE;
 
     reg [31:0] reset_count = 32'd0;
@@ -39,6 +39,7 @@ module uart_hello_fpga_top #(
     ) u_hello (
         .clk(clk),
         .rst(rst_i),
+        .uart_rx_i(uart_rx),
         .uart_tx_o(uart_tx),
         .flash_sck_out(flash_sck_out),
         .flash_cs_out(flash_cs_out),
