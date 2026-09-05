@@ -48,18 +48,18 @@ module app #(
     localparam [7:0] S_NAK = 8'h15;
     localparam [7:0] BUS_SPI = 8'h08;
 
-    localparam integer SERPROG_MAX_WRITE = 256;
-    localparam integer SERPROG_MAX_READ  = 256;
-    localparam integer TX_BUFFER_SIZE    = SERPROG_MAX_READ + 1;
+    localparam integer TX_BUFFER_SIZE = 257;
 
-    localparam [3:0] ST_IDLE           = 4'd0;
-    localparam [3:0] ST_WAIT_EXTRA     = 4'd1;
-    localparam [3:0] ST_WAIT_SPI_WRITE = 4'd2;
-    localparam [3:0] ST_SPI_START      = 4'd3;
-    localparam [3:0] ST_SPI_WAIT       = 4'd4;
-    localparam [3:0] ST_TX_RESP        = 4'd5;
+    localparam [4:0] ST_IDLE           = 5'd0;
+    localparam [4:0] ST_WAIT_EXTRA     = 5'd1;
+    localparam [4:0] ST_WAIT_SPI_WRITE = 5'd2;
+    localparam [4:0] ST_SPI_START      = 5'd3;
+    localparam [4:0] ST_SPI_WAIT       = 5'd4;
+    localparam [4:0] ST_TX_RESP        = 5'd5;
+    localparam [4:0] ST_TX_SPI_ACK     = 5'd6;
+    localparam [4:0] ST_TX_SPI_READ    = 5'd7;
 
-    reg [3:0] state;
+    reg [4:0] state;
     wire [7:0] rx_data;
     wire       rx_valid;
     reg [7:0] current_cmd;
@@ -73,10 +73,8 @@ module app #(
     reg       tx_start;
     wire      tx_busy;
     wire      tx_done;
-    reg [8:0] spi_write_remaining;
-    reg [8:0] spi_read_remaining;
-    reg [8:0] spi_read_target;
-    reg [8:0] spi_read_index;
+    reg [23:0] spi_write_remaining;
+    reg [23:0] spi_read_remaining;
     reg [7:0] spi_tx_byte;
     reg       spi_start;
     wire      spi_busy;
@@ -89,7 +87,6 @@ module app #(
     wire      spi_mosi;
     reg [7:0] bus_type_reg;
     reg       activity;
-    integer   fill_idx;
 
     function [7:0] command_map_byte;
         input [4:0] idx;
@@ -110,16 +107,6 @@ module app #(
                 ascii_char = 8'h30 + value;
             else
                 ascii_char = 8'h41 + (value - 8'd10);
-        end
-    endfunction
-
-    function [8:0] serprog_len9;
-        input [23:0] raw_len;
-        begin
-            if (raw_len == 24'd256)
-                serprog_len9 = 9'd256;
-            else
-                serprog_len9 = {1'b0, raw_len[7:0]};
         end
     endfunction
 
@@ -232,10 +219,8 @@ module app #(
             tx_start <= 1'b0;
             response_len <= 9'd0;
             response_index <= 9'd0;
-            spi_write_remaining <= 9'd0;
-            spi_read_remaining <= 9'd0;
-            spi_read_target <= 9'd0;
-            spi_read_index <= 9'd0;
+            spi_write_remaining <= 24'd0;
+            spi_read_remaining <= 24'd0;
             spi_tx_byte <= 8'd0;
             spi_start <= 1'b0;
             spi_read_phase <= 1'b0;
@@ -259,6 +244,25 @@ module app #(
                     tx_data <= tx_buffer[response_index];
                     tx_start <= 1'b1;
                 end
+            end else if (state == ST_TX_SPI_ACK) begin
+                if (tx_done) begin
+                    spi_tx_byte <= 8'hFF;
+                    spi_read_phase <= 1'b1;
+                    state <= ST_SPI_START;
+                end else if (!tx_busy) begin
+                    tx_data <= S_ACK;
+                    tx_start <= 1'b1;
+                end
+            end else if (state == ST_TX_SPI_READ) begin
+                if (tx_done) begin
+                    if (spi_read_remaining != 24'd0) begin
+                        spi_tx_byte <= 8'hFF;
+                        state <= ST_SPI_START;
+                    end else begin
+                        flash_cs_reg <= 1'b1;
+                        state <= ST_IDLE;
+                    end
+                end
             end else if (state == ST_WAIT_SPI_WRITE) begin
                 if (rx_valid) begin
                     spi_tx_byte <= rx_data;
@@ -276,32 +280,25 @@ module app #(
                     spi_timeout_count <= 32'd0;
 
                     if (spi_read_phase) begin
-                        tx_buffer[spi_read_index + 9'd1] <= spi_rx_byte;
+                        tx_data <= spi_rx_byte;
+                        tx_start <= 1'b1;
 
-                        if (spi_read_remaining > 9'd1) begin
-                            spi_read_remaining <= spi_read_remaining - 9'd1;
-                            spi_read_index <= spi_read_index + 9'd1;
-                            spi_tx_byte <= 8'h00;
-                            state <= ST_SPI_START;
+                        if (spi_read_remaining > 24'd1) begin
+                            spi_read_remaining <= spi_read_remaining - 24'd1;
                         end else begin
-                            spi_read_remaining <= 9'd0;
-                            spi_read_index <= spi_read_index + 9'd1;
+                            spi_read_remaining <= 24'd0;
                             spi_read_phase <= 1'b0;
-                            flash_cs_reg <= 1'b1;
-                            tx_buffer[0] <= S_ACK;
-                            send_response(spi_read_target + 9'd1);
                         end
+                        state <= ST_TX_SPI_READ;
                     end else begin
-                        if (spi_write_remaining > 9'd1) begin
-                            spi_write_remaining <= spi_write_remaining - 9'd1;
+                        if (spi_write_remaining > 24'd1) begin
+                            spi_write_remaining <= spi_write_remaining - 24'd1;
                             state <= ST_WAIT_SPI_WRITE;
                         end else begin
-                            spi_write_remaining <= 9'd0;
+                            spi_write_remaining <= 24'd0;
 
-                            if (spi_read_remaining != 9'd0) begin
-                                spi_read_phase <= 1'b1;
-                                spi_tx_byte <= 8'h00;
-                                state <= ST_SPI_START;
+                            if (spi_read_remaining != 24'd0) begin
+                                state <= ST_TX_SPI_ACK;
                             end else begin
                                 flash_cs_reg <= 1'b1;
                                 tx_buffer[0] <= S_ACK;
@@ -313,22 +310,12 @@ module app #(
                     spi_timeout_count <= spi_timeout_count + 32'd1;
                 end else begin
                     flash_cs_reg <= 1'b1;
-                    spi_write_remaining <= 9'd0;
-                    spi_read_remaining <= 9'd0;
+                    spi_write_remaining <= 24'd0;
+                    spi_read_remaining <= 24'd0;
                     spi_read_phase <= 1'b0;
 
-                    if (spi_read_target != 9'd0) begin
-                        tx_buffer[0] <= S_ACK;
-                        for (fill_idx = 0; fill_idx < SERPROG_MAX_READ; fill_idx = fill_idx + 1) begin
-                            if ((fill_idx >= spi_read_index) && (fill_idx < spi_read_target)) begin
-                                tx_buffer[fill_idx + 1] <= 8'hFF;
-                            end
-                        end
-                        send_response(spi_read_target + 9'd1);
-                    end else begin
-                        tx_buffer[0] <= S_NAK;
-                        send_response(9'd1);
-                    end
+                    tx_buffer[0] <= S_NAK;
+                    send_response(9'd1);
                 end
             end else if (rx_valid) begin
                 activity <= 1'b1;
@@ -408,24 +395,16 @@ module app #(
                                     send_response(9'd1);
                                 end
                                 S_S_SPI_OP: begin
-                                    if (({cmd_buffer[2], cmd_buffer[1], cmd_buffer[0]} > SERPROG_MAX_WRITE) ||
-                                        ({rx_data, cmd_buffer[4], cmd_buffer[3]} > SERPROG_MAX_READ)) begin
-                                        tx_buffer[0] <= S_NAK;
-                                        send_response(9'd1);
-                                    end else begin
-                                        spi_write_remaining <= serprog_len9({cmd_buffer[2], cmd_buffer[1], cmd_buffer[0]});
-                                        spi_read_remaining <= serprog_len9({rx_data, cmd_buffer[4], cmd_buffer[3]});
-                                        spi_read_target <= serprog_len9({rx_data, cmd_buffer[4], cmd_buffer[3]});
-                                        spi_read_index <= 9'd0;
+                                    begin
+                                        spi_write_remaining <= {cmd_buffer[2], cmd_buffer[1], cmd_buffer[0]};
+                                        spi_read_remaining <= {rx_data, cmd_buffer[4], cmd_buffer[3]};
                                         spi_read_phase <= 1'b0;
                                         flash_cs_reg <= 1'b0;
 
                                         if ({cmd_buffer[2], cmd_buffer[1], cmd_buffer[0]} != 24'd0) begin
                                             state <= ST_WAIT_SPI_WRITE;
                                         end else if ({rx_data, cmd_buffer[4], cmd_buffer[3]} != 24'd0) begin
-                                            spi_tx_byte <= 8'h00;
-                                            spi_read_phase <= 1'b1;
-                                            state <= ST_SPI_START;
+                                            state <= ST_TX_SPI_ACK;
                                         end else begin
                                             flash_cs_reg <= 1'b1;
                                             tx_buffer[0] <= S_ACK;
