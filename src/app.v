@@ -15,20 +15,32 @@ module app #(
     input  wire flash_miso_in,
     output wire done
 );
+    // Bank 0
     localparam [7:0] S_NOP          = 8'h00;
     localparam [7:0] S_Q_IFACE      = 8'h01;
     localparam [7:0] S_Q_CMDMAP     = 8'h02;
     localparam [7:0] S_Q_PGMNAME    = 8'h03;
     localparam [7:0] S_Q_SERBUF     = 8'h04;
     localparam [7:0] S_Q_BUSTYPE    = 8'h05;
-    localparam [7:0] S_Q_WRNMAXLEN  = 8'h08;
-    localparam [7:0] S_O_INIT       = 8'h0B;
-    localparam [7:0] S_O_DELAY      = 8'h0E;
-    localparam [7:0] S_O_EXEC       = 8'h0F;
+
+    // localparam [7:0] S_Q_CHIPSIZE  = 8'h06;
+    // localparam [7:0] S_Q_OPBUF     = 8'h07
+
+    // Bank 1
+    // localparam [7:0] S_Q_WRNMAXLEN   = 8'h08;
+    // localparam [7:0] S_R_BYTE        = 8'h09;
+    // localparam [7:0] S_R_NBYTES      = 8'h0A;
+    // localparam [7:0] S_O_INIT        = 8'h0B;
+    // localparam [7:0] S_O_WRITEB      = 8'h0C;
+    // localparam [7:0] S_O_WRITEN      = 8'h0D;
+    // localparam [7:0] S_O_DELAY       = 8'h0E;
+    // localparam [7:0] S_O_EXEC        = 8'h0F;
+
+    // Bank 2
     localparam [7:0] S_SYNCNOP      = 8'h10;
-    localparam [7:0] S_Q_RDNMAXLEN  = 8'h11;
+    // localparam [7:0] S_Q_RDNMAXLEN  = 8'h11;
     localparam [7:0] S_S_BUSTYPE    = 8'h12;
-    localparam [7:0] S_CMD_S_SPI_OP = 8'h13;
+    localparam [7:0] S_S_SPI_OP = 8'h13;
     localparam [7:0] S_S_SPI_FREQ   = 8'h14;
     localparam [7:0] S_S_PIN_STATE  = 8'h15;
 
@@ -117,13 +129,6 @@ module app #(
             response_len  <= len;
             response_index <= 9'd0;
             state <= ST_TX_RESP;
-        end
-    endtask
-
-    task automatic build_ack_only;
-        begin
-            tx_buffer[0] <= S_ACK;
-            send_response(9'd1);
         end
     endtask
 
@@ -332,6 +337,7 @@ module app #(
                         current_cmd <= rx_data;
 
                         case (rx_data)
+                            // Bank 0
                             S_NOP: begin
                                 tx_buffer[0] <= S_ACK;
                                 send_response(9'd1);
@@ -359,42 +365,18 @@ module app #(
                                 tx_buffer[1] <= BUS_SPI;
                                 send_response(9'd2);
                             end
-                            S_Q_WRNMAXLEN: begin
-                                tx_buffer[0] <= S_ACK;
-                                tx_buffer[1] <= 8'd0;
-                                tx_buffer[2] <= 8'd1;
-                                tx_buffer[3] <= 8'd0;
-                                send_response(9'd4);
-                            end
-                            S_O_INIT: begin
-                                build_ack_only();
-                            end
-                            S_O_DELAY: begin
-                                tx_buffer[0] <= S_NAK;
-                                send_response(9'd1);
-                            end
-                            S_O_EXEC: begin
-                                tx_buffer[0] <= S_NAK;
-                                send_response(9'd1);
-                            end
+                            // Bank 2
                             S_SYNCNOP: begin
                                 tx_buffer[0] <= S_NAK;
                                 tx_buffer[1] <= S_ACK;
                                 send_response(9'd2);
-                            end
-                            S_Q_RDNMAXLEN: begin
-                                tx_buffer[0] <= S_ACK;
-                                tx_buffer[1] <= 8'd0;
-                                tx_buffer[2] <= 8'd1;
-                                tx_buffer[3] <= 8'd0;
-                                send_response(9'd4);
                             end
                             S_S_BUSTYPE: begin
                                 extra_count <= 8'd1;
                                 extra_index <= 8'd0;
                                 state <= ST_WAIT_EXTRA;
                             end
-                            S_CMD_S_SPI_OP: begin
+                            S_S_SPI_OP: begin
                                 extra_count <= 8'd6;
                                 extra_index <= 8'd0;
                                 state <= ST_WAIT_EXTRA;
@@ -421,15 +403,11 @@ module app #(
                         if (extra_index == extra_count - 8'd1) begin
                             case (current_cmd)
                                 S_S_BUSTYPE: begin
-                                    if (rx_data == BUS_SPI) begin
-                                        bus_type_reg <= rx_data;
-                                        tx_buffer[0] <= S_ACK;
-                                    end else begin
-                                        tx_buffer[0] <= S_NAK;
-                                    end
+                                    bus_type_reg <= rx_data;
+                                    tx_buffer[0] <= S_ACK;
                                     send_response(9'd1);
                                 end
-                                S_CMD_S_SPI_OP: begin
+                                S_S_SPI_OP: begin
                                     if (({cmd_buffer[2], cmd_buffer[1], cmd_buffer[0]} > SERPROG_MAX_WRITE) ||
                                         ({rx_data, cmd_buffer[4], cmd_buffer[3]} > SERPROG_MAX_READ)) begin
                                         tx_buffer[0] <= S_NAK;
